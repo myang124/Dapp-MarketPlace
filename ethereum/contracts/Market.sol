@@ -2,44 +2,46 @@ pragma solidity ^0.8.0;
 
 contract MarketPlace{
 
-    //manager takes a %2 fee.
-    uint constant FEE = 2;
+    //id of the item
+    uint id;
     
     //items that users can buy/list
     struct Item {
         string name;
         string description;
+        uint id;
         uint price;
         string condition;
         address owner;
+        bool sold;
     }
 
     //keeps track of the users activity.
     struct User {
         address account;
         Item[] orders;
-        Item[] purchaseHistory;
         Item[] selling;
     }
 
     //keeps track of all the users and items
     mapping(address => User) public users;
+    mapping(uint => Item) public items;
     address[] usersList;
-    Item[] items;
 
     //manager is the one that deploys the contract
     address manager; 
 
     constructor () {
         manager = msg.sender;
+        id = 0;
     }
 
     /**
-    *@dev returns list of items for sale
-    *@return list of items for sale
+    *@dev returns items id listed for sale
+    *@return items with id
     */
-    function getItems() public view returns(Item[] memory){
-        return items;
+    function getItems(uint itemID) public view returns(Item memory){
+        return items[itemID];
     }
 
     /*
@@ -79,10 +81,13 @@ contract MarketPlace{
             name: name,
             description: description,
             price: price,
+            id: id,
             condition: condition,
-            owner: msg.sender
+            owner: msg.sender,
+            sold: false
         });
-        items.push(item);
+        items[id]  =  item;
+        id++;
 
         //add a user in if its its first time listing
         if(users[msg.sender].account != msg.sender){
@@ -91,5 +96,26 @@ contract MarketPlace{
         }
         //add item to users list of items he/she is selling
         users[msg.sender].selling.push(item);
+    }
+
+    /*
+    *@dev allows user to buy a listed item and add to users list and map
+    *param id id of item
+    */
+    function buyItem(uint itemID, address payable itemOwner) payable public {
+        Item storage i = items[itemID];
+
+        require(i.sold == false, "Item is already sold");
+        //buyer cannot buy his own items
+        require(i.owner != msg.sender, "you cannot buy your own listed items");
+        //buyer needs to provide atleast the item price amount note: can include more if buyer wants though
+        require(msg.value >= i.price);
+
+        itemOwner.transfer(msg.value); //2000000000000000000 wei = 2 eth
+        i.sold = true;
+
+        //updating the user struct
+        usersList.push(msg.sender);
+        users[msg.sender].orders.push(i);
     }
 }
